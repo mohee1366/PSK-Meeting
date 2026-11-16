@@ -1,0 +1,24 @@
+{
+  "name": "psk-meeting-enterprise",
+  "private": true,
+  "version": "0.3.0",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "dev": "pnpm --parallel --filter @psk/api --filter @psk/web --filter @psk/website dev",
+    "dev:api": "pnpm --filter @psk/api dev",
+    "dev:web": "pnpm --filter @psk/web dev",
+    "dev:mobile": "pnpm --filter @psk/mobile start",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck",
+    "db:generate": "pnpm --filter @psk/api db:generate",
+    "db:migrate": "pnpm --filter @psk/api db:migrate",
+    "db:seed-admin": "pnpm --filter @psk/api seed:admin",
+    "db:seed-foundation": "pnpm --filter @psk/api seed:foundation",
+    "dev:website": "pnpm --filter @psk/website dev",
+    "test:static": "node --test tests/*.test.mjs"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "turbo": "^2.5.0"
+  }
+}

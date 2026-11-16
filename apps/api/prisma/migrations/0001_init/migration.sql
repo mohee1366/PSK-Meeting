@@ -1,0 +1,20 @@
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+CREATE TYPE "UserRole" AS ENUM ('SUPER_ADMIN','ROOM_ADMIN','DEPT_MANAGER','EMPLOYEE');
+CREATE TYPE "ReservationStatus" AS ENUM ('PENDING','APPROVED','REJECTED','CANCELLED','COMPLETED');
+CREATE TYPE "AuditAction" AS ENUM ('CREATE','UPDATE','DELETE','LOGIN','LOGOUT','APPROVE','REJECT','IMPORT','EXPORT');
+CREATE TABLE "Site" ("id" TEXT PRIMARY KEY,"code" TEXT NOT NULL UNIQUE,"name" TEXT NOT NULL,"city" TEXT NOT NULL,"isActive" BOOLEAN NOT NULL DEFAULT true,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "Room" ("id" TEXT PRIMARY KEY,"code" TEXT NOT NULL UNIQUE,"name" TEXT NOT NULL,"siteId" TEXT NOT NULL REFERENCES "Site"("id"),"capacity" INTEGER NOT NULL CHECK ("capacity">0),"features" JSONB NOT NULL DEFAULT '[]'::jsonb,"isActive" BOOLEAN NOT NULL DEFAULT true,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "User" ("id" TEXT PRIMARY KEY,"employeeCode" TEXT UNIQUE,"fullName" TEXT NOT NULL,"email" TEXT UNIQUE,"mobile" TEXT UNIQUE,"passwordHash" TEXT NOT NULL,"role" "UserRole" NOT NULL DEFAULT 'EMPLOYEE',"department" TEXT,"isActive" BOOLEAN NOT NULL DEFAULT true,"mustChangePassword" BOOLEAN NOT NULL DEFAULT true,"sessionVersion" INTEGER NOT NULL DEFAULT 0,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL);
+CREATE TABLE "UserSite" ("userId" TEXT NOT NULL REFERENCES "User"("id") ON DELETE CASCADE,"siteId" TEXT NOT NULL REFERENCES "Site"("id") ON DELETE CASCADE,PRIMARY KEY("userId","siteId"));
+CREATE TABLE "Reservation" ("id" TEXT PRIMARY KEY,"roomId" TEXT NOT NULL REFERENCES "Room"("id"),"siteId" TEXT NOT NULL REFERENCES "Site"("id"),"userId" TEXT NOT NULL REFERENCES "User"("id"),"title" TEXT NOT NULL,"description" TEXT,"startsAt" TIMESTAMP(3) NOT NULL,"endsAt" TIMESTAMP(3) NOT NULL,"attendeeCount" INTEGER NOT NULL DEFAULT 1,"status" "ReservationStatus" NOT NULL DEFAULT 'PENDING',"approvedById" TEXT REFERENCES "User"("id"),"approvedAt" TIMESTAMP(3),"cancellationReason" TEXT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL,CHECK ("endsAt">"startsAt"),CHECK ("attendeeCount">0));
+-- Database-level overlap protection: only active bookings block the room.
+ALTER TABLE "Reservation" ADD CONSTRAINT "reservation_no_overlap" EXCLUDE USING gist ("roomId" WITH =, tsrange("startsAt","endsAt",'[)') WITH &&) WHERE ("status" IN ('PENDING','APPROVED'));
+CREATE TABLE "AuditLog" ("id" TEXT PRIMARY KEY,"actorId" TEXT REFERENCES "User"("id") ON DELETE SET NULL,"action" "AuditAction" NOT NULL,"entityType" TEXT NOT NULL,"entityId" TEXT,"siteId" TEXT,"metadata" JSONB,"ipAddress" TEXT,"userAgent" TEXT,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX "Room_siteId_isActive_idx" ON "Room"("siteId","isActive");
+CREATE INDEX "User_role_isActive_idx" ON "User"("role","isActive");
+CREATE INDEX "UserSite_siteId_idx" ON "UserSite"("siteId");
+CREATE INDEX "Reservation_roomId_startsAt_endsAt_idx" ON "Reservation"("roomId","startsAt","endsAt");
+CREATE INDEX "Reservation_siteId_startsAt_status_idx" ON "Reservation"("siteId","startsAt","status");
+CREATE INDEX "Reservation_userId_startsAt_idx" ON "Reservation"("userId","startsAt");
+CREATE INDEX "AuditLog_actorId_createdAt_idx" ON "AuditLog"("actorId","createdAt");
+CREATE INDEX "AuditLog_siteId_createdAt_idx" ON "AuditLog"("siteId","createdAt");

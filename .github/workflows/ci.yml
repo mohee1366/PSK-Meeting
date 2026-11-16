@@ -1,0 +1,59 @@
+name: PSK Meeting CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: psk_meeting
+          POSTGRES_USER: psk
+          POSTGRES_PASSWORD: psk_ci_only_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U psk -d psk_meeting"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql://psk:psk_ci_only_password@localhost:5432/psk_meeting?schema=public
+      JWT_SECRET: ci-only-jwt-secret-not-for-production-0123456789
+      QR_HMAC_SECRET: ci-only-qr-hmac-secret-not-for-production-0123456789
+      OTP_HMAC_SECRET: ci-only-otp-hmac-secret-not-for-production-0123456789
+      SMS_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.0.0 --activate
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm db:generate
+      - name: Validate Prisma schema
+        run: pnpm --filter @psk/api exec prisma validate
+      - name: Apply migrations to clean PostgreSQL
+        run: pnpm db:migrate
+      - name: Typecheck all workspaces
+        run: pnpm typecheck
+      - name: Build web, website and API
+        run: pnpm build
+      - name: Run static integrity tests
+        run: pnpm test:static

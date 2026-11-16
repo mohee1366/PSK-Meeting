@@ -1,0 +1,39 @@
+name: Build PSK Meeting Android APK
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-android-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate EAS credentials
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID }}
+          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+          EXPO_PUBLIC_DEMO_MODE: ${{ vars.EXPO_PUBLIC_DEMO_MODE || 'true' }}
+        run: |
+          test -n "$EXPO_TOKEN" || (echo "Missing repository secret EXPO_TOKEN"; exit 1)
+          test -n "$EXPO_PROJECT_ID" || (echo "Missing repository secret EXPO_PROJECT_ID"; exit 1)
+          if [ "$EXPO_PUBLIC_DEMO_MODE" = "false" ]; then
+            test -n "$EXPO_PUBLIC_API_URL" || (echo "Missing repository variable EXPO_PUBLIC_API_URL"; exit 1)
+            case "$EXPO_PUBLIC_API_URL" in https://*) ;; *) echo "EXPO_PUBLIC_API_URL must use HTTPS"; exit 1;; esac
+          fi
+      - name: Build preview APK with EAS
+        working-directory: apps/mobile
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          EXPO_PROJECT_ID: ${{ secrets.EXPO_PROJECT_ID }}
+          EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+          EXPO_PUBLIC_DEMO_MODE: ${{ vars.EXPO_PUBLIC_DEMO_MODE || 'true' }}
+        run: |
+          npx --yes eas-cli@latest build --platform android --profile preview --non-interactive --wait

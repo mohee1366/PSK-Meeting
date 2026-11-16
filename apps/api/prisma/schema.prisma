@@ -1,0 +1,208 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ROOM_ADMIN
+  DEPT_MANAGER
+  EMPLOYEE
+}
+
+enum ReservationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  APPROVE
+  REJECT
+  IMPORT
+  EXPORT
+}
+
+enum ServiceRequestType {
+  CATERING
+  CLEANING
+  MAINTENANCE
+  OTHER
+}
+
+enum ServiceRequestStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  REJECTED
+}
+
+model Site {
+  id             String           @id @default(uuid())
+  code           String           @unique
+  name           String
+  city           String
+  isActive       Boolean          @default(true)
+  rooms          Room[]
+  users          UserSite[]
+  reservations   Reservation[]
+  serviceRequests ServiceRequest[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+}
+
+model Room {
+  id             String           @id @default(uuid())
+  code           String           @unique
+  name           String
+  siteId         String
+  site           Site             @relation(fields: [siteId], references: [id])
+  capacity       Int
+  features       Json             @default("[]")
+  isActive       Boolean          @default(true)
+  reservations   Reservation[]
+  serviceRequests ServiceRequest[]
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([siteId, isActive])
+}
+
+model User {
+  id              String           @id @default(uuid())
+  employeeCode    String?          @unique
+  fullName        String
+  email           String?          @unique
+  mobile          String?          @unique
+  passwordHash    String
+  role            UserRole         @default(EMPLOYEE)
+  department      String?
+  isActive        Boolean          @default(true)
+  mustChangePassword Boolean       @default(true)
+  sessionVersion  Int              @default(0)
+  failedLoginCount Int             @default(0)
+  lockedUntil     DateTime?
+  sites           UserSite[]
+  reservations    Reservation[]
+  approvals       Reservation[]    @relation("ReservationApprover")
+  auditLogs       AuditLog[]
+  serviceRequests ServiceRequest[]
+  qrCheckIns      QrCheckIn[]
+  passwordResetOtps PasswordResetOtp[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([role, isActive])
+}
+
+model UserSite {
+  userId String
+  siteId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  site   Site   @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@id([userId, siteId])
+  @@index([siteId])
+}
+
+model Reservation {
+  id                 String            @id @default(uuid())
+  roomId             String
+  room               Room              @relation(fields: [roomId], references: [id])
+  siteId             String
+  site               Site              @relation(fields: [siteId], references: [id])
+  userId             String
+  user               User              @relation(fields: [userId], references: [id])
+  title              String
+  description        String?
+  startsAt           DateTime
+  endsAt             DateTime
+  attendeeCount      Int               @default(1)
+  status             ReservationStatus @default(PENDING)
+  approvedById       String?
+  approver           User?             @relation("ReservationApprover", fields: [approvedById], references: [id])
+  approvedAt         DateTime?
+  cancellationReason String?
+  serviceRequests    ServiceRequest[]
+  checkIn             QrCheckIn?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([roomId, startsAt, endsAt])
+  @@index([siteId, startsAt, status])
+  @@index([userId, startsAt])
+}
+
+model AuditLog {
+  id         String      @id @default(uuid())
+  actorId    String?
+  actor      User?       @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     AuditAction
+  entityType String
+  entityId   String?
+  siteId     String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([siteId, createdAt])
+  @@index([entityType, entityId])
+}
+
+model ServiceRequest {
+  id           String               @id @default(uuid())
+  type         ServiceRequestType
+  status       ServiceRequestStatus  @default(OPEN)
+  description  String
+  requestedAt  DateTime?
+  requesterId  String
+  requester    User                 @relation(fields: [requesterId], references: [id])
+  roomId       String
+  room         Room                 @relation(fields: [roomId], references: [id])
+  siteId       String
+  site         Site                 @relation(fields: [siteId], references: [id])
+  reservationId String?
+  reservation  Reservation?         @relation(fields: [reservationId], references: [id])
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([siteId, status, createdAt])
+  @@index([requesterId, createdAt])
+}
+
+model QrCheckIn {
+  id            String      @id @default(uuid())
+  reservationId String      @unique
+  reservation   Reservation @relation(fields: [reservationId], references: [id])
+  nonce         String      @unique
+  checkedById   String
+  checkedBy     User        @relation(fields: [checkedById], references: [id])
+  checkedAt     DateTime    @default(now())
+  @@index([checkedById, checkedAt])
+}
+
+model PasswordResetOtp {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash  String
+  expiresAt DateTime
+  attempts  Int      @default(0)
+  consumedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([userId, createdAt])
+  @@index([expiresAt, consumedAt])
+}

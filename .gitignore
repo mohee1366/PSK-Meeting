@@ -1,0 +1,12 @@
+node_modules
+.pnpm-store
+dist
+.expo
+.env
+.env.*
+!.env.example
+coverage
+*.log
+.DS_Store
+backups/*.dump
+backups/*.sha256

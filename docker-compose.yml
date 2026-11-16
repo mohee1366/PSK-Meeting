@@ -1,0 +1,57 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: psk_meeting
+      POSTGRES_USER: psk
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+    volumes:
+      - psk_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U psk -d psk_meeting"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      API_PORT: 3000
+      DATABASE_URL: postgresql://psk:${POSTGRES_PASSWORD}@postgres:5432/psk_meeting?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
+      QR_HMAC_SECRET: ${QR_HMAC_SECRET:?Set QR_HMAC_SECRET in .env}
+      OTP_HMAC_SECRET: ${OTP_HMAC_SECRET:?Set OTP_HMAC_SECRET in .env}
+      SMS_ENABLED: ${SMS_ENABLED:-false}
+      KAVENEGAR_API_KEY: ${KAVENEGAR_API_KEY:-}
+      KAVENEGAR_SENDER: ${KAVENEGAR_SENDER:-}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
+    depends_on:
+      postgres:
+        condition: service_healthy
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_URL: ""
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:80"
+    depends_on:
+      api:
+        condition: service_healthy
+  website:
+    build:
+      context: .
+      dockerfile: apps/website/Dockerfile
+      args:
+        VITE_APP_URL: ${APP_PUBLIC_URL:-http://localhost:8080}
+    restart: unless-stopped
+    ports:
+      - "${SITE_PORT:-8081}:80"
+volumes:
+  psk_pgdata:

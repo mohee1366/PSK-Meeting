@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "PSK Meeting",
+    "slug": "psk-meeting",
+    "scheme": "pskmeeting",
+    "version": "0.3.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "ir.psk.meeting"
+    },
+    "android": {
+      "package": "ir.psk.meeting",
+      "adaptiveIcon": {
+        "backgroundColor": "#102a43",
+        "foregroundImage": "./assets/adaptive-icon.png"
+      }
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "برای اسکن QR رزروهای جلسات، دسترسی به دوربین لازم است.",
+          "barcodeScannerEnabled": true
+        }
+      ]
+    ],
+    "icon": "./assets/icon.png",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#102a43"
+    }
+  }
+}
